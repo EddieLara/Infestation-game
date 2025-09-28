@@ -84,7 +84,7 @@ const INITIAL_PLAYER_SPEED = 3;
 const MAX_PLAYER_SPEED = 5;
 const PLAYER_ACCELERATION = 1.2;
 const PLAYER_FRICTION = 0.90;
-const ZOMBIE_SPEED_BOOST = 1.15;
+const ZOMBIE_SPEED_BOOST = 1.50;
 const ZOMBIE_PUSH_MODIFIER = 0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005;
 const ZOMBIE_TORQUE_MODIFIER = 0.1;
 const ZOMBIE_MIN_SPEED = 3;
@@ -93,16 +93,16 @@ const SPRINT_COOLDOWN = 30000;
 const SPY_DURATION = 15000;
 const SPY_COOLDOWN = 30000;
 const BUTTERFLY_DURATION = 5000;
-const BUTTERFLY_SPEED = 4;
+const BUTTERFLY_SPEED = 7;
 const INVISIBILITY_CLOAK_BREAK_DISTANCE = 250;
-const SKATEBOARD_SPEED_BOOST = 5;
+const SKATEBOARD_SPEED_BOOST = 8;
 const SKATEBOARD_WIDTH = 90;
 const SKATEBOARD_HEIGHT = 35;
 const DRONE_FOLLOW_FACTOR = 0.02; // ALTERAÇÃO 2: Valor reduzido para mais delay
 const DRONE_MAX_AMMO = 10;
 const GRENADE_FUSE_TIME = 1500;
 const GRENADE_RADIUS = 200;
-const GRENADE_KNOCKBACK_IMPulse = 30;
+const GRENADE_KNOCKBACK_IMPulse = 10;
 const LARGE_BALL_SPEED = 12;
 const LARGE_BALL_RADIUS = 25;
 const CANNON_COOLDOWN = 2000;
@@ -647,7 +647,7 @@ function createNewPlayer(socket) {
         role: 'human',
         selectedSlot: 0,
         activeFunction: ' ',
-        score: 10000,
+        score: 20000,
         isSprinting: false,
         sprintAvailable: true,
         isSpying: false,
