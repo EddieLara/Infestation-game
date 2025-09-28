@@ -22,6 +22,7 @@ let isChatVisible = true; // NEW: Controls chat visibility
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
+
     // NEW: Chat toggle button logic
     const toggleChatBtn = document.getElementById('toggleChatBtn');
     if (toggleChatBtn) {
