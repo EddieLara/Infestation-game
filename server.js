@@ -78,21 +78,15 @@ const SEA_AREA = {
     height: 4000
 };
 
-const SINKING_AREA = {
-    x: 5165,
-    y: 0,
-    width: 2400, // <<-- Aumentamos a largura (era 2600)
-    height: 4000
-};
-
 const SHARK_BASE_SPEED = 1.5;
 const INITIAL_PLAYER_SIZE = 35;
 const INITIAL_PLAYER_SPEED = 3;
 const MAX_PLAYER_SPEED = 5;
 const PLAYER_ACCELERATION = 1.2;
 const PLAYER_FRICTION = 0.90;
-const ZOMBIE_SPEED_BOOST = 1.50;
-const ZOMBIE_PUSH_MODIFIER = 2;
+const ZOMBIE_SPEED_BOOST = 1.15;
+const ZOMBIE_PUSH_MODIFIER = 0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005;
+const ZOMBIE_TORQUE_MODIFIER = 0.1;
 const ZOMBIE_MIN_SPEED = 3;
 const SPRINT_DURATION = 10000;
 const SPRINT_COOLDOWN = 30000;
@@ -104,7 +98,7 @@ const INVISIBILITY_CLOAK_BREAK_DISTANCE = 250;
 const SKATEBOARD_SPEED_BOOST = 5;
 const SKATEBOARD_WIDTH = 90;
 const SKATEBOARD_HEIGHT = 35;
-const DRONE_FOLLOW_FACTOR = 0.05;
+const DRONE_FOLLOW_FACTOR = 0.02; // ALTERAÇÃO 2: Valor reduzido para mais delay
 const DRONE_MAX_AMMO = 10;
 const GRENADE_FUSE_TIME = 1500;
 const GRENADE_RADIUS = 200;
@@ -115,8 +109,6 @@ const CANNON_COOLDOWN = 2000;
 const CANNON_FRONT_OFFSET = 100;
 const TRAP_DURATION = 1000;
 const TRAP_SIZE = 40;
-const PORTAL_SIZE = 60;
-const PORTAL_COOLDOWN = 1000;
 const DROPPED_ITEM_SIZE = 40;
 const PICKUP_RADIUS = 60;
 const DUCT_TRAVEL_TIME = 1000 / 20;
@@ -128,16 +120,14 @@ const MINE_SIZE = 40;
 const MINE_EXPLOSION_RADIUS = 100;
 const MINE_PRIMARY_KNOCKBACK = 20;
 const MINE_SPLASH_KNOCKBACK = 15;
-const BOX_PUSH_FORCE = 400;
-const ROTATION_ON_COLLISION_FACTOR = 0.000002;
-const FORCE_NORMAL_GLOVE_MULTIPLIER = 5;
-const LARGE_BALL_OBJECT_KNOCKBACK = 0.5;
-const LARGE_BALL_PLAYER_KNOCKBACK = 0.5;
-const RHINOCEROS_FORCE = 1.5;
+const BOX_PUSH_FORCE = 10;
+const ROTATION_ON_COLLISION_FACTOR = 0.000003; // Rotação dos objetos
+const LARGE_BALL_OBJECT_KNOCKBACK = 0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002;
+const LARGE_BALL_PLAYER_KNOCKBACK = 0.0005;
+const RHINOCEROS_FORCE = 0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002;
 const RHINOCEROS_RADIUS = 150;
 const RHINOCEROS_COOLDOWN = 2000;
-const RUNNING_TENNIS_SPEED_BOOST = 5;
-const SINKING_DURATION = 3000;
+const RUNNING_TENNIS_SPEED_BOOST = 2;
 
 const FUNCTION_COSTS = {
     athlete: 500,
@@ -159,32 +149,29 @@ const cannonballCategory = 0x0010;
 
 function getDensityById(id) {
     switch (id) {
-        // ALTERADO: Densidade do carro muito aumentada
-        case 'car':
-            return 0.5;
         case 'big_table':
-            return 0.0008;;
+            return 0.000000000000000000000008;
         case 'sofa':
         case 'big_bed':
         case 'big_bed2':
-            return 0.0008;
+            return 0.000000000000000000000008;
         case 'box':
-            return 0.0006;
+            return 0.000000000000000000000006;
         default:
-            return 0.0005;
+            return 0.000000000000000000000005;
     }
 }
 
 function createPlayerBody(player) {
-    const infectionRadius = player.width * 0.75;
+    const infectionRadius = INITIAL_PLAYER_SIZE * 0.75;
     const physicsRadius = player.role === 'human' ?
-        infectionRadius / 3 :
-        infectionRadius / 2;
+        infectionRadius / 2 :
+        infectionRadius * 0.8;
 
     const body = Matter.Bodies.circle(player.x, player.y, physicsRadius, {
         inertia: Infinity,
         frictionAir: 0.02,
-        friction: 0,
+        friction: 0.0005, // Atrito do jogador
         label: 'player',
         collisionFilter: {
             category: playerCategory,
@@ -257,7 +244,6 @@ function initializeGame() {
         traps: [],
         mines: [],
         largeBalls: [],
-        portals: [],
         sharks: [],
         floatingTexts: [],
         objects: [],
@@ -269,7 +255,6 @@ function initializeGame() {
         startTime: 60,
         timeLeft: ROUND_DURATION,
         postRoundTimeLeft: 10,
-        lastPortalUseTimestamp: 0,
         hidingSpots: [{
             x: 3150,
             y: 2320,
@@ -324,55 +309,48 @@ function initializeGame() {
     createSharks();
 }
 
-// ** INÍCIO DAS ALTERAÇÕES **
-// Função para adicionar gemas e aumentar a velocidade do humano
-function addGems(player, amount) {
-    if (!player || amount <= 0) {
-        if (player) player.gems += amount;
-        return;
-    }
-
-    if (player.role === 'human') {
-        const oldGems = player.gems;
-        player.gems += amount;
-        const newGems = player.gems;
-
-        const milestonesPassed = Math.floor(newGems / 100) - Math.floor(oldGems / 100);
-        if (milestonesPassed > 0) {
-            let speedIncrease = 0;
-            for (let i = 0; i < milestonesPassed; i++) {
-                speedIncrease += Math.random() * (0.02 - 0.01) + 0.01;
-            }
-            player.speed += speedIncrease;
-            player.originalSpeed += speedIncrease; // Aplica o bônus na velocidade base também
-        }
-    } else {
-        // Se não for humano (ex: zumbi pegando gemas de humano infectado), apenas adiciona
-        player.gems += amount;
-    }
-}
-
-// Função para remover gemas e diminuir a velocidade do zumbi
-function removeGems(player, amount) {
+function addScore(player, amount) {
     if (!player || amount <= 0) return;
 
-    const oldGems = player.gems;
-    player.gems = Math.max(0, player.gems - amount);
-    const newGems = player.gems;
+    player.score += amount;
 
-    if (player.role === 'zombie') {
-        const milestonesPassed = Math.floor(oldGems / 100) - Math.floor(newGems / 100);
-        if (milestonesPassed > 0) {
-            let speedDecrease = 0;
-            for (let i = 0; i < milestonesPassed; i++) {
-                speedDecrease += Math.random() * (0.02 - 0.01) + 0.01;
-            }
-            player.speed = Math.max(ZOMBIE_MIN_SPEED, player.speed - speedDecrease);
-            player.originalSpeed = Math.max(ZOMBIE_MIN_SPEED, player.originalSpeed - speedDecrease);
+    if (player.role === 'human') {
+        // Enquanto a pontuação do jogador ultrapassar o marco, adicione velocidade
+        while (player.score >= player.nextSpeedBoost) {
+            const speedIncrease = Math.random() * (0.01 - 0.005) + 0.005;
+            player.speed += speedIncrease;
+            player.originalSpeed += speedIncrease;
+
+            // Define o próximo marco, adicionando um valor entre 150 e 200 ao marco atual
+            const nextMilestoneIncrease = Math.random() * (200 - 150) + 150;
+            player.nextSpeedBoost += nextMilestoneIncrease;
         }
     }
 }
-// ** FIM DAS ALTERAÇÕES **
+
+function removeScore(player, amount) {
+    if (!player || amount <= 0) return;
+
+    const oldScore = player.score;
+    player.score = Math.max(0, player.score - amount);
+
+    // Quando um humano gasta/perde pontos, ele também perde uma quantidade proporcional de velocidade
+    if (player.role === 'human') {
+        const scoreLost = oldScore - player.score;
+        const milestonesLost = Math.floor(oldScore / 200) - Math.floor(player.score / 200);
+
+        if (milestonesLost > 0) {
+            let speedDecrease = 0;
+            for (let i = 0; i < milestonesLost; i++) {
+                speedDecrease += Math.random() * (0.01 - 0.005) + 0.005;
+            }
+            player.speed = Math.max(INITIAL_PLAYER_SPEED, player.speed - speedDecrease);
+            player.originalSpeed = Math.max(INITIAL_PLAYER_SPEED, player.originalSpeed - speedDecrease);
+        }
+        // Atualiza o marco para evitar exploits
+        player.nextSpeedBoost = Math.floor(player.score / 200) * 200 + (Math.random() * (200 - 150) + 150);
+    }
+}
 
 function createSharks() {
     gameState.sharks = [];
@@ -451,12 +429,6 @@ function createWorldBodies() {
         width: 380,
         height: 200
     }, {
-        id: 'car',
-        x: 3650,
-        y: 300,
-        width: 280,
-        height: 450
-    }, {
         id: 'small_bed',
         x: 700,
         y: 220,
@@ -526,9 +498,10 @@ function createWorldBodies() {
         const body = Matter.Bodies.rectangle(data.x + data.width / 2, data.y + data.height / 2, data.width, data.height, {
             isStatic: data.isStatic || false,
             angle: (data.rotation || 0) * (Math.PI / 180),
-            friction: 0.000002,
-            frictionAir: 0.07,
-            restitution: 0.5,
+            friction: 0.0005, // Atrito dos objetos
+            frictionAir: 0.09,
+            frictionAngular: 10,
+            restitution: 0.0000000000000000000000000000000000000000000000000000000002,
             density: getDensityById(data.id),
             label: data.isStatic ? 'wall' : 'furniture',
             collisionFilter: {
@@ -600,29 +573,28 @@ function buildWalls(structure) {
         // ALTERADO: Estrutura da casa de baixo modificada
         const mirroredHouseWalls = [
             // As coordenadas 'y' são calculadas para espelhar a posição da parede original
-            { x: s.x, y: WORLD_HEIGHT - s.y - wt, width: s.width, height: wt },
-            { x: s.x, y: WORLD_HEIGHT - (s.y + s.height - wt - 200) - wt, width: s.width - 1300, height: wt },
-            { x: s.x, y: WORLD_HEIGHT - s.y - 820, width: wt, height: 820 },
-            { x: s.x, y: WORLD_HEIGHT - (s.y + 1020) - (s.height - 1220), width: wt, height: s.height - 1220 },
-            { x: s.x + s.width - wt, y: WORLD_HEIGHT - s.y - 250, width: wt, height: 250 },
-            { x: s.x + s.width - wt, y: WORLD_HEIGHT - (s.y + 650) - ((s.height - 770) - 650), width: wt, height: (s.height - 770) - 650 },
+            { x: s.x, y: WORLD_HEIGHT - s.y - wt, width: s.width, height: wt }, // Parede de baixo
+            { x: s.x, y: WORLD_HEIGHT - (s.y + s.height - wt - 200) - wt, width: s.width - 400, height: wt }, // Parede de cima
+            { x: s.x, y: WORLD_HEIGHT - s.y - 670, width: wt, height: 650 }, // Parede da esquerda
+            { x: s.x, y: WORLD_HEIGHT - (s.y + 1020) - (s.height - 1220), width: wt, height: s.height - 1220 }, // Parede da esquerda
+            { x: s.x + 930, y: WORLD_HEIGHT - (s.y + 1020) - (s.height - 1220), width: wt, height: s.height - 1420 },
+            { x: s.x + s.width - wt, y: WORLD_HEIGHT - s.y - 300, width: wt, height: 300 }, // Parede da frente da casa
+            { x: s.x + s.width - wt, y: WORLD_HEIGHT - (s.y + 650) - ((s.height - 770) - 650), width: wt, height: (s.height - 770) - 650 }, // Parede da frente da casa
             { x: s.x + 900, y: WORLD_HEIGHT - s.y - 470, width: wt, height: 470 },
-            // { x: s.x + 600, y: WORLD_HEIGHT - (s.y + 1020) - 450, width: wt, height: 450 }, // <-- PAREDE REMOVIDA PARA CRIAR UM CORREDOR
-            { x: s.x + 1500, y: WORLD_HEIGHT - s.y - 300, width: wt, height: 300 },
-            { x: s.x + 1338, y: WORLD_HEIGHT - (s.y + 1030) - 440, width: wt, height: 440 },
-            { x: s.x + 2200, y: WORLD_HEIGHT - s.y - 470, width: wt, height: 470 },
-            { x: s.x + 2195, y: WORLD_HEIGHT - (s.y + 750) - 150, width: wt, height: 150 },
+            { x: s.x + 900, y: WORLD_HEIGHT - (s.y + 1020), width: wt, height: 200 }, // Coluna do meio da casa
+            { x: s.x + 2250, y: WORLD_HEIGHT - (s.y + 1020) - 450, width: wt, height: 600 }, // Este
+            { x: s.x + 1500, y: WORLD_HEIGHT - s.y - 230, width: wt, height: 180 }, // Este
+            { x: s.x + 1538, y: WORLD_HEIGHT - (s.y + 1030) - 440, width: wt, height: 440 }, // Este
+            { x: s.x + 650, y: WORLD_HEIGHT - s.y - 1420, width: wt, height: 400 }, // Este
+            { x: s.x + 2000, y: WORLD_HEIGHT - (s.y + 750) - 150, width: wt, height: 150 }, // Pequenininho
             { x: s.x, y: WORLD_HEIGHT - (s.y + 400) - wt, width: 700, height: wt },
             { x: s.x + 1800, y: WORLD_HEIGHT - (s.y + 400) - wt, width: 270, height: wt },
             { x: s.x + 250, y: WORLD_HEIGHT - (s.y + 1020) - wt, width: 850, height: wt },
-            // { x: s.x + 1150, y: WORLD_HEIGHT - (s.y + 400) - wt, width: 720, height: wt }, // <-- PAREDE LONGA SUBSTITUÍDA PELAS DUAS ABAIXO
-            { x: s.x + 1150, y: WORLD_HEIGHT - (s.y + 400) - wt, width: 300, height: wt }, // <-- Pedaço 1 da parede, criando uma porta
-            { x: s.x + 1570, y: WORLD_HEIGHT - (s.y + 400) - wt, width: 300, height: wt }, // <-- Pedaço 2 da parede, criando uma porta
-            { x: s.x + 1800, y: WORLD_HEIGHT - s.y - (400 + wt), width: wt, height: 400 + wt },
-            { x: s.x, y: WORLD_HEIGHT - (s.y + 750) - wt, width: 550, height: wt },
-            { x: s.x + 1330, y: WORLD_HEIGHT - (s.y + 830) - wt, width: 533, height: wt },
-            { x: s.x + 2000, y: WORLD_HEIGHT - (s.y + 830) - wt, width: 697, height: wt },
-            { x: s.x + 480, y: WORLD_HEIGHT - (s.y + 620) - 200, width: wt, height: 200 }
+            { x: s.x + 1500, y: WORLD_HEIGHT - (s.y + 400) - wt, width: 350, height: wt }, // Este
+            { x: s.x + 900, y: WORLD_HEIGHT - (s.y + 400) - wt, width: 350, height: wt }, // Este
+            { x: s.x + 2000, y: WORLD_HEIGHT - s.y - (400 + wt), width: wt, height: 400 + wt }, // Este
+            { x: s.x + 1338, y: WORLD_HEIGHT - (s.y + 1020) - wt, width: 533, height: wt }, // Este
+            { x: s.x + 1800, y: WORLD_HEIGHT - (s.y + 830) - wt, width: 897, height: wt }, // Corredor pequeno
         ];
         s.walls.push(...mirroredHouseWalls);
 
@@ -632,8 +604,7 @@ function buildWalls(structure) {
         const wallChunk = (s.height - doorHeight) / 2;
         s.walls.push({ x: s.x + 1400, y: s.y, width: s.width - 200, height: wt });
         s.walls.push({ x: s.x + 1200, y: s.y + s.height - wt, width: s.width, height: wt });
-        s.walls.push({ x: s.x + 1200, y: s.y, width: wt, height: wallChunk });
-        s.walls.push({ x: s.x + 1200, y: s.y + wallChunk + doorHeight, width: wt, height: wallChunk });
+        s.walls.push({ x: s.x + 1200, y: s.y + wallChunk - 225, width: wt, height: wallChunk + 325 });
         s.walls.push({ x: s.x + s.width - wt + 1200, y: s.y, width: wt, height: s.height - 460 });
         s.walls.push({ x: s.x + s.width - wt + 1200, y: s.y + 460, width: wt, height: 140 });
     }
@@ -671,11 +642,12 @@ function createNewPlayer(socket) {
         height: INITIAL_PLAYER_SIZE * 1.5,
         speed: INITIAL_PLAYER_SPEED,
         originalSpeed: INITIAL_PLAYER_SPEED,
+        nextSpeedBoost: 200,
         rotation: 0,
         role: 'human',
         selectedSlot: 0,
         activeFunction: ' ',
-        gems: 1000,
+        score: 10000,
         isSprinting: false,
         sprintAvailable: true,
         isSpying: false,
@@ -708,8 +680,10 @@ function createNewPlayer(socket) {
         isSleeping: false,
         sleepUntil: 0,
         rhinocerosCooldownUntil: 0,
-        slowedUntil: null, // NOVO: Para efeito de lentidão
-        originalSpeedBeforeSlow: null, // NOVO: Para restaurar a velocidade
+        slowedUntil: null,
+        originalSpeedBeforeSlow: null,
+        chatMessage: null,
+        magicAntidotesPurchased: 0,
         input: {
             movement: {
                 up: false,
@@ -769,7 +743,7 @@ function dropHeldItem(player) {
             case 'bow':
             case 'blowdart': // NOVO: Blowdart também pode ter dados específicos
                 dropData.width = 70;
-                dropData.height = 20;
+                dropData.height = 15;
                 break;
             case 'invisibilityCloak':
                 player.isInvisible = false;
@@ -778,10 +752,6 @@ function dropHeldItem(player) {
             case 'card':
                 dropData.width = 37;
                 dropData.height = 25;
-                break;
-            case 'angelWings':
-                player.isFlyingWithWings = false;
-                dropData.cooldownUntil = itemToDrop.cooldownUntil;
                 break;
         }
         gameState.groundItems.push(dropData);
@@ -814,7 +784,7 @@ function updateSharks() {
                     closestPlayer = player;
                 }
             }
-            if (closestPlayer) {
+            if (closestPlayer && minDistance < 1000) { // MODIFIED: Distance check
                 shark.state = 'attacking';
                 shark.targetPlayerId = closestPlayer.id;
             }
@@ -842,7 +812,8 @@ function updateSharks() {
                         setTimeout(() => {
                             const revivedPlayer = gameState.players[target.id];
                             if (revivedPlayer) {
-                                revivedPlayer.role = 'zombie';
+                                // ALTERAÇÃO 3: Jogador não vira mais zumbi, apenas respawna.
+                                // A linha "revivedPlayer.role = 'zombie';" foi removida.
                                 const playerBody = world.bodies.find(b => b.playerId === revivedPlayer.id);
                                 if (playerBody) {
                                     Matter.Body.setPosition(playerBody, {
@@ -951,72 +922,16 @@ function updateGameState() {
         }
     }
 
-    for (let i = gameState.groundItems.length - 1; i >= 0; i--) {
-        const item = gameState.groundItems[i];
-
-        // Se o item está na área do mar
-        if (isColliding(item, SINKING_AREA)) {
-            // Se ele ainda não começou a afundar, marque o início
-            if (!item.isSinking) {
-                item.isSinking = true;
-                item.sinkingStartTime = now;
-            }
-        }
-
-        // Se o item está afundando, atualize seu progresso
-        if (item.isSinking) {
-            const elapsed = now - item.sinkingStartTime;
-            const progress = elapsed / SINKING_DURATION;
-
-            if (progress >= 1) {
-                // Se o tempo acabou, remova o item do jogo
-                gameState.groundItems.splice(i, 1);
-            } else {
-                // Caso contrário, envie o progresso para o cliente
-                item.sinkingProgress = progress;
-            }
-        }
-    }
-
-    for (let i = gameState.objects.length - 1; i >= 0; i--) {
-        const obj = gameState.objects[i];
-        const body = bodiesMap[obj.uniqueId]; // Pega o corpo físico do objeto
-
-        // Pula objetos estáticos (como o ATM) ou que não têm corpo físico
-        if (!body || body.isStatic) {
-            continue;
-        }
-
-        // Se o objeto está na área do mar
-        if (isColliding(obj, SINKING_AREA)) {
-            // Se ele ainda não começou a afundar, marque o início
-            if (!obj.isSinking) {
-                obj.isSinking = true;
-                obj.sinkingStartTime = now;
-            }
-        }
-
-        // Se o objeto está afundando, atualize seu progresso
-        if (obj.isSinking) {
-            const elapsed = now - obj.sinkingStartTime;
-            const progress = elapsed / SINKING_DURATION;
-
-            if (progress >= 1) {
-                // Se o tempo acabou, remova o objeto completamente
-                if (body) Matter.World.remove(world, body); // Remove do mundo da física
-                delete bodiesMap[obj.uniqueId];             // Remove do nosso mapa de referência
-                gameState.objects.splice(i, 1);             // Remove do estado do jogo
-            } else {
-                // Caso contrário, envie o progresso para o cliente
-                obj.sinkingProgress = progress;
-            }
-        }
-    }
-
     for (const id in gameState.players) {
         const player = gameState.players[id];
         const playerBody = world.bodies.find(b => b.playerId === id);
         if (!player || !playerBody || !player.input || player.isBeingEaten) continue;
+
+        // *** INÍCIO DA ALTERAÇÃO 2 ***
+        if (player.chatMessage && now - player.chatMessage.createdAt > 4000) {
+            delete player.chatMessage;
+        }
+        // *** FIM DA ALTERAÇÃO 2 ***
 
         // NOVO: Handle slow effect expiration
         if (player.slowedUntil && now > player.slowedUntil) {
@@ -1043,19 +958,19 @@ function updateGameState() {
         }
 
         // ALTERADO: Lógica de tamanho separada para humanos e zumbis
-        const gemBonus = Math.sqrt(Math.max(0, player.gems)) * 0.2;
+        const scoreBonus = Math.sqrt(Math.max(0, player.score)) * 0.6;
         if (player.role === 'zombie') {
             const baseSize = 40; // Base de largura maior
-            player.width = baseSize + gemBonus;
+            player.width = baseSize + scoreBonus;
             player.height = player.width * 1.4; // Proporção altura/largura menor para parecer mais largo
         } else {
             const baseSize = 35;
-            player.width = baseSize + gemBonus;
+            player.width = baseSize + scoreBonus;
             player.height = player.width * 1.5;
         }
 
 
-        const infectionRadius = player.width * 0.75;
+        const infectionRadius = INITIAL_PLAYER_SIZE * 1.0;
         player.physicalHitbox = {
             cx: playerBody.position.x,
             cy: playerBody.position.y,
@@ -1161,22 +1076,12 @@ function updateGameState() {
 
             let effectiveSpeed = player.isSprinting ? MAX_PLAYER_SPEED : player.speed;
 
-            // ALTERAÇÃO AQUI: Lógica de velocidade por gemas para humanos
-            if (player.role === 'human') {
-                const gemsForSpeed = Math.min(player.gems, 50);
-                const speedBonus = (gemsForSpeed / 50) * 0.3; // Bônus máximo de 0.3
-                effectiveSpeed += speedBonus;
-            }
-
             if (player.inventory.some(i => i && i.id === 'runningTennis')) {
                 effectiveSpeed += RUNNING_TENNIS_SPEED_BOOST;
             }
 
             if (player.role === 'zombie') effectiveSpeed *= ZOMBIE_SPEED_BOOST;
 
-            if (isColliding(player, SAND_AREA)) {
-                effectiveSpeed *= 0.90;
-            }
             if (isColliding(player, SEA_AREA)) {
                 effectiveSpeed *= 0.70;
             }
@@ -1441,49 +1346,6 @@ function updateGameState() {
             gameState.mines.splice(i, 1);
         }
     }
-
-    if (now > gameState.lastPortalUseTimestamp) {
-        const portalsByOwner = {};
-        for (const portal of gameState.portals) {
-            if (!portalsByOwner[portal.ownerId]) portalsByOwner[portal.ownerId] = [];
-            portalsByOwner[portal.ownerId].push(portal);
-        }
-
-        for (const ownerId in portalsByOwner) {
-            if (portalsByOwner[ownerId].length === 2) {
-                const [portalA, portalB] = portalsByOwner[ownerId];
-                for (const player of Object.values(gameState.players)) {
-                    const playerBody = world.bodies.find(b => b.playerId === player.id);
-                    if (!playerBody) continue;
-
-                    let teleported = false;
-                    if (Math.hypot(playerBody.position.x - portalA.x, playerBody.position.y - portalA.y) < PORTAL_SIZE / 2) {
-                        Matter.Body.setPosition(playerBody, {
-                            x: portalB.x,
-                            y: portalB.y
-                        });
-                        teleported = true;
-                    } else if (Math.hypot(playerBody.position.x - portalB.x, playerBody.position.y - portalB.y) < PORTAL_SIZE / 2) {
-                        Matter.Body.setPosition(playerBody, {
-                            x: portalA.x,
-                            y: portalA.y
-                        });
-                        teleported = true;
-                    }
-
-                    if (teleported) {
-                        gameState.lastPortalUseTimestamp = now + PORTAL_COOLDOWN;
-                        break;
-                    }
-                }
-                if (now > gameState.lastPortalUseTimestamp) {
-                    continue;
-                } else {
-                    break;
-                }
-            }
-        }
-    }
 }
 
 function setupCollisionEvents() {
@@ -1531,9 +1393,11 @@ function setupCollisionEvents() {
 
             if (playerBody && objectBody && !objectBody.isStatic) {
                 const player = gameState.players[playerBody.playerId];
-                if (player && Matter.Vector.magnitudeSquared(playerBody.velocity) > 0.1) {
-                    let forceMagnitude = BOX_PUSH_FORCE;
-                    if (player.inventory.some(i => i.id === 'normalGlove')) forceMagnitude *= FORCE_NORMAL_GLOVE_MULTIPLIER;
+                const playerVelocityMagnitude = Matter.Vector.magnitude(playerBody.velocity);
+
+                if (player && playerVelocityMagnitude > 0.1) {
+                    let forceMagnitude = BOX_PUSH_FORCE * playerVelocityMagnitude;
+
                     if (player.role === 'zombie') forceMagnitude *= ZOMBIE_PUSH_MODIFIER;
 
                     const forceDirection = Matter.Vector.normalise(playerBody.velocity);
@@ -1545,7 +1409,14 @@ function setupCollisionEvents() {
 
                         const leverArm = Matter.Vector.sub(contactPoint, objectBody.position);
                         const torque = Matter.Vector.cross(leverArm, playerBody.velocity);
-                        const newAngularVelocity = objectBody.angularVelocity + (torque * ROTATION_ON_COLLISION_FACTOR);
+
+                        let currentRotationFactor = ROTATION_ON_COLLISION_FACTOR;
+
+                        if (player.role === 'zombie') {
+                            currentRotationFactor *= ZOMBIE_TORQUE_MODIFIER;
+                        }
+
+                        const newAngularVelocity = objectBody.angularVelocity + (torque * currentRotationFactor);
                         Matter.Body.setAngularVelocity(objectBody, newAngularVelocity);
                     }
                 }
@@ -1590,19 +1461,22 @@ function setupCollisionEvents() {
                         dropHeldItem(human);
                         if (human.isSpying) human.isSpying = false;
 
-                                // ALTERAÇÃO: Lógica de roubo de gemas e velocidade ao infectar
-                        const percentageToSteal = 0.7 + Math.random() * 0.1; // Gera um valor aleatório entre 0.7 (70%) e 0.8 (80%)
-                        const gemsStolen = Math.floor(human.gems * percentageToSteal);
-                        const speedLost = (human.speed - ZOMBIE_MIN_SPEED) * percentageToSteal;
+                        const percentageToSteal = 0.7 + Math.random() * 0.1;
+                        const scoreStolen = Math.floor(human.score * percentageToSteal);
 
-                        human.gems = Math.max(0, human.gems - gemsStolen);
-                        human.speed -= speedLost;
-                        human.originalSpeed -= speedLost;
+                        let speedStolen = 0;
+                        const speedStealMilestones = Math.floor(scoreStolen / 150);
+                        for (let i = 0; i < speedStealMilestones; i++) {
+                            speedStolen += Math.random() * (0.01 - 0.005) + 0.005;
+                        }
 
-                        addGems(zombie, gemsStolen);
-                        zombie.speed += speedLost;
-                        zombie.originalSpeed += speedLost;
-                                // FIM DA ALTERAÇÃO
+                        human.score = Math.max(0, human.score - scoreStolen);
+                        human.speed = Math.max(ZOMBIE_MIN_SPEED, human.speed - speedStolen);
+                        human.originalSpeed = Math.max(ZOMBIE_MIN_SPEED, human.originalSpeed - speedStolen);
+
+                        addScore(zombie, scoreStolen);
+                        zombie.speed += speedStolen;
+                        zombie.originalSpeed += speedStolen;
 
                         human.role = 'zombie';
                         io.emit('newMessage', {
@@ -1669,7 +1543,9 @@ io.on('connection', (socket) => {
 
         const player = gameState.players[socket.id];
         if (player) {
-            player.name = username;
+            // *** INÍCIO DA ALTERAÇÃO 3 ***
+            player.name = username.substring(0, 10);
+            // *** FIM DA ALTERAÇÃO 3 ***
         }
     });
 
@@ -1793,8 +1669,8 @@ io.on('connection', (socket) => {
     socket.on('chooseFunction', (func) => {
         const player = gameState.players[socket.id];
         const cost = FUNCTION_COSTS[func];
-        if (gameState.gamePhase === 'running' && player && player.activeFunction === ' ' && cost !== undefined && player.gems >= cost && !gameState.takenFunctions.includes(func)) {
-            player.gems = Math.max(0, player.gems - cost);
+        if (gameState.gamePhase === 'running' && player && player.activeFunction === ' ' && cost !== undefined && player.score >= cost && !gameState.takenFunctions.includes(func)) {
+            removeScore(player, cost);
             player.activeFunction = func;
             gameState.takenFunctions.push(func);
         }
@@ -1803,8 +1679,8 @@ io.on('connection', (socket) => {
     socket.on('buyZombieAbility', (abilityId) => {
         const player = gameState.players[socket.id];
         const cost = ZOMBIE_ABILITY_COSTS[abilityId];
-        if (player && player.role === 'zombie' && !player.zombieAbility && cost !== undefined && player.gems >= cost) {
-            removeGems(player, cost);
+        if (player && player.role === 'zombie' && !player.zombieAbility && cost !== undefined && player.score >= cost) {
+            removeScore(player, cost);
             player.zombieAbility = abilityId;
             if (abilityId === 'trap') {
                 player.trapsLeft = 1;
@@ -1822,30 +1698,13 @@ io.on('connection', (socket) => {
 
         let cost, itemData;
         switch (itemId) {
-            case "normalGlove":
+            case 'magicAntidote':
+                if ((player.magicAntidotesPurchased || 0) >= 10) {
+                    return;
+                }
                 cost = 500;
                 itemData = {
-                    id: 'normalGlove'
-                };
-                break;
-            case 'antidote':
-                cost = 200;
-                itemData = {
-                    id: 'antidote'
-                };
-                break;
-                // NOVO: Caso para o Magic Antidote
-            case 'magicAntidote':
-                cost = 3000;
-                itemData = {
                     id: 'magicAntidote'
-                };
-                break;
-                // NOVO: Caso para o Magic Egg
-            case 'magicEgg':
-                cost = 2000;
-                itemData = {
-                    id: 'magicEgg'
                 };
                 break;
             case 'fishingRod':
@@ -1862,7 +1721,7 @@ io.on('connection', (socket) => {
                     ammo: 200
                 };
                 break;
-            case 'blowdart': // NOVO: Caso para o Blowdart
+            case 'blowdart':
                 cost = 2000;
                 itemData = {
                     id: 'blowdart',
@@ -1870,9 +1729,12 @@ io.on('connection', (socket) => {
                 };
                 break;
         }
-        if (cost && player.gems >= cost) {
-            player.gems = Math.max(0, player.gems - cost);
+        if (cost && player.score >= cost) {
+            removeScore(player, cost);
             player.inventory.push(itemData);
+            if (itemId === 'magicAntidote') {
+                player.magicAntidotesPurchased++;
+            }
         }
     });
 
@@ -1907,7 +1769,7 @@ io.on('connection', (socket) => {
                 };
                 break;
             case "gravityGlove":
-                cost = 5000;
+                cost = 10000;
                 itemData = {
                     id: 'gravityGlove',
                     uses: 2
@@ -1926,17 +1788,10 @@ io.on('connection', (socket) => {
                     cooldownUntil: 0
                 };
                 break;
-            case 'angelWings':
-                cost = 30000;
-                itemData = {
-                    id: 'angelWings',
-                    cooldownUntil: 0
-                };
-                break;
         }
 
-        if (cost && player.gems >= cost) {
-            player.gems = Math.max(0, player.gems - cost);
+        if (cost && player.score >= cost) {
+            removeScore(player, cost);
             if (itemId === 'inventoryUpgrade') {
                 player.hasInventoryUpgrade = true;
                 player.inventorySlots = 2;
@@ -1968,31 +1823,6 @@ io.on('connection', (socket) => {
 
         const now = Date.now();
         switch (actionData.type) {
-            case 'toggle_angel_wings_flight':
-                const wingItem = player.inventory.find(i => i && i.id === 'angelWings');
-                if (wingItem) {
-                    const pBody = world.bodies.find(b => b.playerId === player.id);
-                    if (player.isFlyingWithWings) { // Deactivating
-                        player.isFlyingWithWings = false;
-                        player.angelWingsFlightEndsAt = 0;
-                        wingItem.cooldownUntil = now + 20000; // 20s cooldown
-                        if (pBody) pBody.collisionFilter.mask = 0xFFFFFFFF;
-                    } else if (now > (wingItem.cooldownUntil || 0)) { // Activating
-                        player.isFlyingWithWings = true;
-                        player.angelWingsFlightEndsAt = now + 10000; // 10s flight
-                        if (pBody) pBody.collisionFilter.mask = 0;
-                    }
-                }
-                break;
-            case 'use_antidote':
-                const antidote = player.inventory.find(i => i.id === 'antidote');
-                if (antidote) {
-                    player.inventory = player.inventory.filter(i => i.id !== 'antidote');
-                    if (gameState.gamePhase === 'waiting') {
-                        player.initialZombieProtection = 0.50;
-                    }
-                }
-                break;
             case 'use_magic_antidote':
                 const magicAntidote = player.inventory.find(i => i.id === 'magicAntidote');
                 if (magicAntidote) {
@@ -2000,17 +1830,6 @@ io.on('connection', (socket) => {
                     if (gameState.gamePhase === 'waiting') {
                         player.initialZombieProtection = 0.99;
                     }
-                }
-                break;
-            case 'place_portal':
-                if (player.inventory.some(i => i.id === 'portals') && gameState.portals.filter(p => p.ownerId === player.id).length < 2) {
-                    gameState.portals.push({
-                        ownerId: player.id,
-                        x: player.x,
-                        y: player.y,
-                        width: PORTAL_SIZE,
-                        height: 80
-                    });
                 }
                 break;
             case 'select_slot':
@@ -2102,8 +1921,8 @@ io.on('connection', (socket) => {
                         hasHit: false
                     });
                 } else if (selectedItem?.id === 'cannon' && now > (selectedItem.cooldownUntil || 0)) {
-                    if (player.gems >= 25) {
-                        player.gems = Math.max(0, player.gems - 25);
+                    if (player.score >= 25) {
+                        removeScore(player, 25);
                         selectedItem.cooldownUntil = now + CANNON_COOLDOWN;
                         const spawnPos = {
                             x: player.x + player.width / 2 + Math.cos(player.rotation) * CANNON_FRONT_OFFSET,
@@ -2111,7 +1930,7 @@ io.on('connection', (socket) => {
                         };
                         const uniqueId = `ball_${nextUniqueObjectId++}`;
                         const ballBody = Matter.Bodies.circle(spawnPos.x, spawnPos.y, LARGE_BALL_RADIUS, {
-                            restitution: 0.3,
+                            restitution: 0.1,
                             friction: 0.05,
                             frictionAir: 0.001,
                             density: 0.8,
@@ -2204,7 +2023,7 @@ io.on('connection', (socket) => {
                         angle: obj.rotation,
                         frictionAir: 0.05,
                         friction: 0.1,
-                        restitution: 0.2,
+                        restitution: 0.1,
                         density: getDensityById(obj.id),
                         label: 'furniture',
                         collisionFilter: {
@@ -2251,25 +2070,25 @@ io.on('connection', (socket) => {
                 if (fishingRod && isColliding(player, SEA_AREA)) {
                     if (fishingRod.uses > 0) {
                         fishingRod.uses--;
-                        let totalGemsWon = 0;
+                        let totalScoreWon = 0;
                         const prizes = [
-                            { gems: 10000, chance: 0.007},
-                            { gems: 5000, chance: 0.01},
-                            { gems: 2000, chance: 0.015 },
-                            { gems: 1000, chance: 0.03 },
-                            { gems: 500, chance: 0.20 },
-                            { gems: 200, chance: 0.20 },
-                            { gems: 100, chance: 0.50 },
-                            { gems: 0, chance: 0.50}
+                            { score: 10000, chance: 0.007},
+                            { score: 5000, chance: 0.01},
+                            { score: 2000, chance: 0.015 },
+                            { score: 1000, chance: 0.03 },
+                            { score: 500, chance: 0.20 },
+                            { score: 200, chance: 0.20 },
+                            { score: 100, chance: 0.50 },
+                            { score: 0, chance: 0.50}
                         ];
                         for (const prize of prizes) {
                             if (Math.random() < prize.chance) {
-                                totalGemsWon += prize.gems;
+                                totalScoreWon += prize.score;
                             }
                         }
-                        addGems(player, totalGemsWon);
+                        addScore(player, totalScoreWon);
                         gameState.floatingTexts.push({
-                            text: `+${totalGemsWon} Gems!`,
+                            text: `+${totalScoreWon} Score!`,
                             x: player.x + player.width / 2,
                             y: player.y,
                             createdAt: Date.now()
@@ -2382,6 +2201,12 @@ io.on('connection', (socket) => {
     socket.on('sendMessage', (text) => {
         const player = gameState.players[socket.id];
         if (player && text && text.trim().length > 0) {
+            // *** INÍCIO DA ALTERAÇÃO 2 ***
+            player.chatMessage = {
+                text: text.substring(0, 40),
+                createdAt: Date.now()
+            };
+            // *** FIM DA ALTERAÇÃO 2 ***
             io.emit('newMessage', {
                 name: player.name,
                 text: text.substring(0, 40),
@@ -2412,7 +2237,6 @@ io.on('connection', (socket) => {
             }
             dropHeldItem(player);
             if (player.activeFunction !== ' ') gameState.takenFunctions = gameState.takenFunctions.filter(a => a !== player.activeFunction);
-            gameState.portals = gameState.portals.filter(p => p.ownerId !== socket.id);
         }
         delete gameState.players[socket.id];
     });
@@ -2458,53 +2282,60 @@ setInterval(() => {
                         Matter.World.remove(world, oldBody);
                         const newBody = createPlayerBody(chosenPlayer);
                         Matter.Body.setPosition(newBody, position);
-                        Matter.Body.setVelocity(newBody, velocity);
-                        Matter.World.add(world, newBody);
+                        Matter.Body.setVelocity(newBody, velocity);
+                            Matter.World.add(world, newBody);
+                        }
                     }
                 }
             }
-        }
-    } else if (gameState.gamePhase === 'running') {
-        let humanCount = Object.values(gameState.players).filter(p => p.role === 'human').length;
-        if (humanCount === 0 && Object.keys(gameState.players).length > 1) {
-            io.emit('newMessage', {
-                name: 'Server',
-                text: 'The Zombies have won!'
-            });
-            gameState.gamePhase = 'post-round';
-            gameState.postRoundTimeLeft = 10;
-            return;
-        }
-        if (gameState.timeLeft <= 0) {
-            io.emit('newMessage', {
-                name: 'Server',
-                text: "Time's up! The Humans survived!"
-            });
-            gameState.gamePhase = 'post-round';
-            gameState.postRoundTimeLeft = 10;
-            return;
-        }
-        gameState.timeLeft--;
-        for (const player of Object.values(gameState.players)) {
-            if (player.role === 'zombie') {
-                // MODIFICADO: Lógica de perda de gemas e velocidade agora usa a nova função
-                const gemLoss = Math.random() * (50 - 10) + 10;
-                removeGems(player, gemLoss);
-            } else if (player.role === 'human') {
-                let gemGain = Math.random() * (50 - 1) + 0.33;
-                if (player.inventory.some(i => i?.id === 'magicEgg')) {
-                    gemGain *= 1.20;
+        } else if (gameState.gamePhase === 'running') {
+            let humanCount = Object.values(gameState.players).filter(p => p.role === 'human').length;
+            if (humanCount === 0 && Object.keys(gameState.players).length > 1) {
+                io.emit('newMessage', {
+                    name: 'Server',
+                    text: 'The Zombies have won!'
+                });
+                gameState.gamePhase = 'post-round';
+                gameState.postRoundTimeLeft = 10;
+                return;
+            }
+            if (gameState.timeLeft <= 0) {
+                io.emit('newMessage', {
+                    name: 'Server',
+                    text: "Time's up! The Humans survived!"
+                });
+                // Bônus para humanos sobreviventes
+                for (const player of Object.values(gameState.players)) {
+                    if (player.role === 'human') {
+                        const bonus = Math.floor(player.score * 0.05);
+                        addScore(player, bonus);
+                    }
                 }
-                // MODIFICADO: Lógica de ganho de gemas e velocidade agora usa a nova função
-                addGems(player, gemGain);
+                gameState.gamePhase = 'post-round';
+                gameState.postRoundTimeLeft = 10;
+                return;
+            }
+            gameState.timeLeft--;
+            for (const player of Object.values(gameState.players)) {
+                if (player.role === 'zombie') {
+                    const speedLoss = Math.random() * (0.01 - 0.005) + 0.005;
+                    player.speed = Math.max(ZOMBIE_MIN_SPEED, player.speed - speedLoss);
+                    player.originalSpeed = Math.max(ZOMBIE_MIN_SPEED, player.originalSpeed - speedLoss);
+
+                    const scoreLoss = Math.floor(Math.random() * (80 - 20 + 1)) + 50;
+                    removeScore(player, scoreLoss);
+
+                } else if (player.role === 'human') {
+                    let scoreGain = Math.random() * (50 - 1) + 0.33;
+                    addScore(player, scoreGain);
+                }
+            }
+        } else if (gameState.gamePhase === 'post-round') {
+            gameState.postRoundTimeLeft--;
+            if (gameState.postRoundTimeLeft < 0) {
+                startNewRound();
             }
         }
-    } else if (gameState.gamePhase === 'post-round') {
-        gameState.postRoundTimeLeft--;
-        if (gameState.postRoundTimeLeft < 0) {
-            startNewRound();
-        }
-    }
 }, 1000);
 
 setInterval(() => {
@@ -2514,7 +2345,7 @@ setInterval(() => {
 
 function startNewRound() {
     const persistentData = {};
-    const exclusiveItems = ['skateboard', 'drone', 'invisibilityCloak', 'gravityGlove', 'portals', 'cannon', 'bow', 'blowdart', 'angelWings', 'magicEgg'];
+    const exclusiveItems = ['skateboard', 'drone', 'invisibilityCloak', 'gravityGlove', 'cannon', 'bow', 'blowdart'];
 
     for (const id in gameState.players) {
         const p = gameState.players[id];
@@ -2523,7 +2354,7 @@ function startNewRound() {
         persistentData[id] = {
             name: p.name,
             hasInventoryUpgrade: p.hasInventoryUpgrade,
-            gems: p.gems,
+            score: p.score,
             speed: p.speed,
             originalSpeed: p.originalSpeed,
             inventory: persistentInventory
@@ -2551,9 +2382,10 @@ function startNewRound() {
             role: 'human',
             selectedSlot: 0,
             activeFunction: ' ',
-            gems: pData.gems,
+            score: pData.score + 1000,
             speed: pData.speed,
             originalSpeed: pData.originalSpeed,
+            nextSpeedBoost: 200,
             isSprinting: false,
             sprintAvailable: true,
             isSpying: false,
@@ -2571,6 +2403,7 @@ function startNewRound() {
             draggedBy: null,
             draggedUntil: null,
             isBeingEaten: false,
+            magicAntidotesPurchased: 0,
         });
 
         player.speed = Math.max(3, player.speed);
@@ -2624,24 +2457,6 @@ function startNewRound() {
             height: DROPPED_ITEM_SIZE
         });
     }
-
-    if (Math.random() < 0.10) {
-        const movableObjects = gameState.objects.filter(o => !o.isStatic);
-        const carObject = gameState.objects.find(o => o.id === 'car');
-        const angelSpawnAreas = [...movableObjects, carObject, ...gameState.sunshades].filter(Boolean);
-
-        if (angelSpawnAreas.length > 0) {
-            const randomArea = angelSpawnAreas[Math.floor(Math.random() * angelSpawnAreas.length)];
-            gameState.groundItems.push({
-                id: 'angelWings',
-                x: randomArea.x + randomArea.width / 2,
-                y: randomArea.y + randomArea.height / 2,
-                width: DROPPED_ITEM_SIZE * 1.5,
-                height: DROPPED_ITEM_SIZE * 1.5
-            });
-        }
-    }
-
 
     const shoesAlreadyInPlay = Object.values(gameState.players).some(p => p.inventory.some(i => i && i.id === 'runningTennis'));
     gameState.runningTennis.spawned = false;

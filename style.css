@@ -25,12 +25,12 @@ canvas {
 
 /* Chat do Jogo (do seu projeto original) */
 #chatInput {
-    display: none;
+    display: block;
     position: absolute;
     bottom: 15px;
     left: 15px;
     transform: none;
-    width: 550px;
+    width: 400px;
     padding: 12px 15px; /* Ajuste no padding */
     font-size: 16px;
     border: 1px solid #555; /* Borda mais sutil */
