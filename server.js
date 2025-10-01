@@ -78,13 +78,13 @@ const SEA_AREA = {
     height: 4000
 };
 
-const SHARK_BASE_SPEED = 1.5;
+const SHARK_BASE_SPEED = 4;
 const INITIAL_PLAYER_SIZE = 35;
-const INITIAL_PLAYER_SPEED = 5;
-const MAX_PLAYER_SPEED = 5;
+const INITIAL_PLAYER_SPEED = 4;
+const MAX_PLAYER_SPEED = 6;
 const PLAYER_ACCELERATION = 1.2;
 const PLAYER_FRICTION = 0.90;
-const ZOMBIE_SPEED_BOOST = 1.50;
+const ZOMBIE_SPEED_BOOST = 1.15;
 const ZOMBIE_PUSH_MODIFIER = 0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005;
 const ZOMBIE_TORQUE_MODIFIER = 0.1;
 const ZOMBIE_MIN_SPEED = 3;
@@ -98,7 +98,7 @@ const INVISIBILITY_CLOAK_BREAK_DISTANCE = 250;
 const SKATEBOARD_SPEED_BOOST = 8;
 const SKATEBOARD_WIDTH = 90;
 const SKATEBOARD_HEIGHT = 35;
-const DRONE_FOLLOW_FACTOR = 0.02; // ALTERAÇÃO 2: Valor reduzido para mais delay
+const DRONE_FOLLOW_FACTOR = 0.2; // ALTERAÇÃO 2: Valor reduzido para mais delay
 const DRONE_MAX_AMMO = 10;
 const GRENADE_FUSE_TIME = 1500;
 const GRENADE_RADIUS = 200;
@@ -120,8 +120,8 @@ const MINE_SIZE = 40;
 const MINE_EXPLOSION_RADIUS = 100;
 const MINE_PRIMARY_KNOCKBACK = 20;
 const MINE_SPLASH_KNOCKBACK = 15;
-const BOX_PUSH_FORCE = 10;
-const ROTATION_ON_COLLISION_FACTOR = 0.000003; // Rotação dos objetos
+const BOX_PUSH_FORCE = 0.5;
+const ROTATION_ON_COLLISION_FACTOR = 0.0000003; // Rotação dos objetos
 const LARGE_BALL_OBJECT_KNOCKBACK = 0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002;
 const LARGE_BALL_PLAYER_KNOCKBACK = 0.0005;
 const RHINOCEROS_FORCE = 0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002;
@@ -150,15 +150,15 @@ const cannonballCategory = 0x0010;
 function getDensityById(id) {
     switch (id) {
         case 'big_table':
-            return 0.000000000000000000000008;
+            return 0.000000000000000008;
         case 'sofa':
         case 'big_bed':
         case 'big_bed2':
-            return 0.000000000000000000000008;
+            return 0.000000000000000008;
         case 'box':
-            return 0.000000000000000000000006;
+            return 0.000000000000000006;
         default:
-            return 0.000000000000000000000005;
+            return 0.000000000000000005;
     }
 }
 
@@ -214,7 +214,7 @@ function initializeGame() {
         height: 80
     }, {
         x: 2075,
-        y: 1845,
+        y: 1700,
         width: 80,
         height: 80
     }];
@@ -237,6 +237,7 @@ function initializeGame() {
     gameState = {
         players: currentPlayers,
         arrows: [],
+        antidoteStock: 0,
         blowdartArrows: [], // NOVO: Array para flechas do Blowdart
         drones: {},
         grenades: [],
@@ -298,7 +299,7 @@ function initializeGame() {
         },
         garage: {
             x: 800,
-            y: 1400,
+            y: 1250,
             width: 700,
             height: 600,
             wallThickness: 70, // ALTERADO: Espessura da parede aumentada
@@ -311,45 +312,12 @@ function initializeGame() {
 
 function addScore(player, amount) {
     if (!player || amount <= 0) return;
-
     player.score += amount;
-
-    if (player.role === 'human') {
-        // Enquanto a pontuação do jogador ultrapassar o marco, adicione velocidade
-        while (player.score >= player.nextSpeedBoost) {
-            const speedIncrease = Math.random() * (0.01 - 0.005) + 0.005;
-            player.speed += speedIncrease;
-            player.originalSpeed += speedIncrease;
-
-            // Define o próximo marco, adicionando um valor entre 150 e 200 ao marco atual
-            const nextMilestoneIncrease = Math.random() * (200 - 150) + 150;
-            player.nextSpeedBoost += nextMilestoneIncrease;
-        }
-    }
 }
 
 function removeScore(player, amount) {
     if (!player || amount <= 0) return;
-
-    const oldScore = player.score;
     player.score = Math.max(0, player.score - amount);
-
-    // Quando um humano gasta/perde pontos, ele também perde uma quantidade proporcional de velocidade
-    if (player.role === 'human') {
-        const scoreLost = oldScore - player.score;
-        const milestonesLost = Math.floor(oldScore / 200) - Math.floor(player.score / 200);
-
-        if (milestonesLost > 0) {
-            let speedDecrease = 0;
-            for (let i = 0; i < milestonesLost; i++) {
-                speedDecrease += Math.random() * (0.01 - 0.005) + 0.005;
-            }
-            player.speed = Math.max(INITIAL_PLAYER_SPEED, player.speed - speedDecrease);
-            player.originalSpeed = Math.max(INITIAL_PLAYER_SPEED, player.originalSpeed - speedDecrease);
-        }
-        // Atualiza o marco para evitar exploits
-        player.nextSpeedBoost = Math.floor(player.score / 200) * 200 + (Math.random() * (200 - 150) + 150);
-    }
 }
 
 function createSharks() {
@@ -435,13 +403,6 @@ function createWorldBodies() {
         width: 138,
         height: 230
     }, {
-        id: 'box',
-        x: 2800,
-        y: 1150,
-        width: 192,
-        height: 192,
-        rotation: 300
-    }, {
         id: 'big_bed',
         x: 1500,
         y: 275,
@@ -457,8 +418,8 @@ function createWorldBodies() {
         id: 'square_table',
         x: 1700,
         y: 780,
-        width: 170,
-        height: 170
+        width: 180,
+        height: 140
     }, {
         id: 'mini_sofa',
         x: 2450,
@@ -488,7 +449,7 @@ function createWorldBodies() {
         x: 1000,
         y: 800,
         width: 340,
-        height: 210
+        height: 180
     }];
 
     const objectData = [...originalObjectData];
@@ -498,10 +459,10 @@ function createWorldBodies() {
         const body = Matter.Bodies.rectangle(data.x + data.width / 2, data.y + data.height / 2, data.width, data.height, {
             isStatic: data.isStatic || false,
             angle: (data.rotation || 0) * (Math.PI / 180),
-            friction: 0.0005, // Atrito dos objetos
-            frictionAir: 0.09,
+            friction: 0.2, // Atrito dos objetos
+            frictionAir: 0.12,
             frictionAngular: 10,
-            restitution: 0.0000000000000000000000000000000000000000000000000000000002,
+            restitution: 0,
             density: getDensityById(data.id),
             label: data.isStatic ? 'wall' : 'furniture',
             collisionFilter: {
@@ -528,6 +489,7 @@ function createWorldBodies() {
         allBodies.push(Matter.Bodies.rectangle(wall.x + wall.width / 2, wall.y + wall.height / 2, wall.width, wall.height, {
             isStatic: true,
             label: 'wall',
+            friction: 1.0,
             collisionFilter: {
                 category: wallCategory
             }
@@ -574,14 +536,14 @@ function buildWalls(structure) {
         const mirroredHouseWalls = [
             // As coordenadas 'y' são calculadas para espelhar a posição da parede original
             { x: s.x, y: WORLD_HEIGHT - s.y - wt, width: s.width, height: wt }, // Parede de baixo
-            { x: s.x, y: WORLD_HEIGHT - (s.y + s.height - wt - 200) - wt, width: s.width - 400, height: wt }, // Parede de cima
+            { x: s.x, y: WORLD_HEIGHT - (s.y + s.height - wt - 200) - wt, width: s.width - 1977, height: wt }, // Parede de cima
+            { x: s.x + 1000, y: WORLD_HEIGHT - (s.y + s.height - wt - 200) - wt, width: s.width - 1400, height: wt }, // Parede de cima
             { x: s.x, y: WORLD_HEIGHT - s.y - 670, width: wt, height: 650 }, // Parede da esquerda
             { x: s.x, y: WORLD_HEIGHT - (s.y + 1020) - (s.height - 1220), width: wt, height: s.height - 1220 }, // Parede da esquerda
-            { x: s.x + 930, y: WORLD_HEIGHT - (s.y + 1020) - (s.height - 1220), width: wt, height: s.height - 1420 },
+            { x: s.x + 930, y: WORLD_HEIGHT - (s.y + 1020) - (s.height - 1220), width: wt, height: s.height - 1220 }, // Corredor dentro da casa
             { x: s.x + s.width - wt, y: WORLD_HEIGHT - s.y - 300, width: wt, height: 300 }, // Parede da frente da casa
             { x: s.x + s.width - wt, y: WORLD_HEIGHT - (s.y + 650) - ((s.height - 770) - 650), width: wt, height: (s.height - 770) - 650 }, // Parede da frente da casa
             { x: s.x + 900, y: WORLD_HEIGHT - s.y - 470, width: wt, height: 470 },
-            { x: s.x + 900, y: WORLD_HEIGHT - (s.y + 1020), width: wt, height: 200 }, // Coluna do meio da casa
             { x: s.x + 2250, y: WORLD_HEIGHT - (s.y + 1020) - 450, width: wt, height: 600 }, // Este
             { x: s.x + 1500, y: WORLD_HEIGHT - s.y - 230, width: wt, height: 180 }, // Este
             { x: s.x + 1538, y: WORLD_HEIGHT - (s.y + 1030) - 440, width: wt, height: 440 }, // Este
@@ -589,11 +551,11 @@ function buildWalls(structure) {
             { x: s.x + 2000, y: WORLD_HEIGHT - (s.y + 750) - 150, width: wt, height: 150 }, // Pequenininho
             { x: s.x, y: WORLD_HEIGHT - (s.y + 400) - wt, width: 700, height: wt },
             { x: s.x + 1800, y: WORLD_HEIGHT - (s.y + 400) - wt, width: 270, height: wt },
-            { x: s.x + 250, y: WORLD_HEIGHT - (s.y + 1020) - wt, width: 850, height: wt },
             { x: s.x + 1500, y: WORLD_HEIGHT - (s.y + 400) - wt, width: 350, height: wt }, // Este
             { x: s.x + 900, y: WORLD_HEIGHT - (s.y + 400) - wt, width: 350, height: wt }, // Este
             { x: s.x + 2000, y: WORLD_HEIGHT - s.y - (400 + wt), width: wt, height: 400 + wt }, // Este
-            { x: s.x + 1338, y: WORLD_HEIGHT - (s.y + 1020) - wt, width: 533, height: wt }, // Este
+            { x: s.x + 1188, y: WORLD_HEIGHT - (s.y + 1020) - wt, width: 700, height: wt }, // Aqui
+            { x: s.x + 250, y: WORLD_HEIGHT - (s.y + 1020) - wt, width: 400, height: wt }, // Aqui
             { x: s.x + 1800, y: WORLD_HEIGHT - (s.y + 830) - wt, width: 897, height: wt }, // Corredor pequeno
         ];
         s.walls.push(...mirroredHouseWalls);
@@ -647,7 +609,7 @@ function createNewPlayer(socket) {
         role: 'human',
         selectedSlot: 0,
         activeFunction: ' ',
-        score: 20000,
+        score: 15000,
         isSprinting: false,
         sprintAvailable: true,
         isSpying: false,
@@ -673,6 +635,7 @@ function createNewPlayer(socket) {
         carryingObject: null,
         portalCooldownUntil: 0,
         hasAntidoteEffect: false,
+        hasAntidoteImmunity: false,
         initialZombieProtection: 0,
         draggedBy: null,
         draggedUntil: null,
@@ -926,6 +889,29 @@ function updateGameState() {
         const player = gameState.players[id];
         const playerBody = world.bodies.find(b => b.playerId === id);
         if (!player || !playerBody || !player.input || player.isBeingEaten) continue;
+
+        if (player.role === 'human' && !player.slowedUntil) {
+            // Define a velocidade inicial e o bônus total que pode ser ganho.
+            const baseSpeed = INITIAL_PLAYER_SPEED; // Velocidade em 0 pontos (ex: 3)
+            const maxSpeed = 7; // Velocidade máxima em 40k pontos
+            const scoreForMaxSpeed = 40000;
+            const totalSpeedBonus = maxSpeed - baseSpeed; // O total de velocidade a ser ganho (ex: 7 - 3 = 4)
+
+            // Garante que a pontuação usada para o cálculo não passe de 40000.
+            const scoreCapped = Math.min(player.score, scoreForMaxSpeed);
+
+            // Calcula a porcentagem de progresso do jogador em direção à pontuação máxima.
+            const progress = scoreCapped / scoreForMaxSpeed; // Um valor de 0.0 a 1.0
+
+            // Calcula o bônus de velocidade atual com base no progresso.
+            const currentBonus = progress * totalSpeedBonus;
+
+            // A nova velocidade é a base mais o bônus atual.
+            const newSpeed = baseSpeed + currentBonus;
+
+            player.speed = newSpeed;
+            player.originalSpeed = newSpeed;
+        }
 
         // *** INÍCIO DA ALTERAÇÃO 2 ***
         if (player.chatMessage && now - player.chatMessage.createdAt > 4000) {
@@ -1699,9 +1685,9 @@ io.on('connection', (socket) => {
         let cost, itemData;
         switch (itemId) {
             case 'magicAntidote':
-                if ((player.magicAntidotesPurchased || 0) >= 10) {
-                    return;
-                }
+                if (gameState.antidoteStock <= 0) {
+                    return; // Impede a compra se o estoque for 0 ou menos
+                }
                 cost = 500;
                 itemData = {
                     id: 'magicAntidote'
@@ -1733,6 +1719,7 @@ io.on('connection', (socket) => {
             removeScore(player, cost);
             player.inventory.push(itemData);
             if (itemId === 'magicAntidote') {
+                gameState.antidoteStock--; 
                 player.magicAntidotesPurchased++;
             }
         }
@@ -1824,11 +1811,11 @@ io.on('connection', (socket) => {
         const now = Date.now();
         switch (actionData.type) {
             case 'use_magic_antidote':
-                const magicAntidote = player.inventory.find(i => i.id === 'magicAntidote');
-                if (magicAntidote) {
-                    player.inventory = player.inventory.filter(i => i.id !== 'magicAntidote');
+                const antidoteIndex = player.inventory.findIndex(i => i && i.id === 'magicAntidote');
+                if (antidoteIndex !== -1) {
                     if (gameState.gamePhase === 'waiting') {
-                        player.initialZombieProtection = 0.99;
+                        player.inventory.splice(antidoteIndex, 1);
+                        player.hasAntidoteImmunity = true;
                     }
                 }
                 break;
@@ -2355,8 +2342,6 @@ function startNewRound() {
             name: p.name,
             hasInventoryUpgrade: p.hasInventoryUpgrade,
             score: p.score,
-            speed: p.speed,
-            originalSpeed: p.originalSpeed,
             inventory: persistentInventory
         };
     }
@@ -2364,6 +2349,9 @@ function startNewRound() {
     Matter.Engine.clear(engine);
 
     initializeGame();
+
+    const totalPlayers = Object.keys(gameState.players).length;
+    gameState.antidoteStock = Math.floor(totalPlayers * 0.7);
 
     for (const id in persistentData) {
         if (!gameState.players[id]) {

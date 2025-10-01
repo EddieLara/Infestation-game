@@ -41,7 +41,6 @@ function loadImage(src) {
 
 const human = loadImage('Sprites/Human.png');
 const zombie = loadImage('Sprites/Zombie.png');
-const box = loadImage('Sprites/Box.png');
 const grass = loadImage('Sprites/Grass.png');
 const grass2 = loadImage('Sprites/Grass2.png'); // NOVO: Carrega a imagem da Grass2
 const street = loadImage('Sprites/Street.png');
@@ -111,7 +110,6 @@ const objectSprites = {
     big_table: bigTable,
     // car: car, // REMOVED
     atm: atmSprite,
-    box: box,
     big_bed: bigBed,
     big_bed2: bigBed2,
     mini_sofa: miniSofa,
@@ -601,7 +599,7 @@ function draw() {
         ctx.drawImage(grassImg, 0, 0, 3100, 2000);
         ctx.drawImage(floorImg, 200, 200, 2697, 1670);
         ctx.save(); // Salva o estado antes de mudar a transparência
-        ctx.globalAlpha = 0.8; // ALTERAÇÃO 1: Define a transparência do mar
+        ctx.globalAlpha = 1; // ALTERAÇÃO 1: Define a transparência do mar
         ctx.drawImage(sea, 4965, 0, 2600, 2000);
         ctx.restore(); // Restaura para a opacidade total
     };
@@ -609,7 +607,7 @@ function draw() {
     // Desenha o mapa original
     drawMapBackground(floors, grass);
 
-    ctx.drawImage(garageFloor, 2000, 1400, 700, 600);
+    ctx.drawImage(garageFloor, 2000, 1250, 700, 600);
 
     // Desenha o mapa espelhado (agora sem o chão da garagem e com o chão 2)
     ctx.save();
@@ -823,9 +821,9 @@ function draw() {
     }
     // *** FIM DA ALTERAÇÃO 4 ***
 
-    ctx.fillStyle = '#000000ff';
-    ctx.strokeStyle = '#23454fff';
-    ctx.lineWidth = 40;
+    ctx.fillStyle = '#110f0fff';
+    ctx.strokeStyle = '#333e41ff';
+    ctx.lineWidth = 15;
     for (const wall of gameState.house.walls) {
         ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
         ctx.strokeRect(wall.x, wall.y, wall.width, wall.height);
@@ -853,7 +851,7 @@ function draw() {
 
     ctx.fillStyle = '#000000ff';
     ctx.strokeStyle = '#222222ff';
-    ctx.lineWidth = 40;
+    ctx.lineWidth = 15;
     for (const wall of gameState.garage.walls) {
         ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
         ctx.strokeRect(wall.x, wall.y, wall.width, wall.height);
@@ -1289,18 +1287,18 @@ function drawHudBackgrounds() {
     ctx.shadowBlur = 10;
 
     // HUD do topo (timer e status)
-    const topHudWidth = 400;
+    const topHudWidth = 320;
     ctx.beginPath();
-    ctx.roundRect(canvas.width / 2 - topHudWidth / 2, 10, topHudWidth, 90, [12]);
+    ctx.roundRect(canvas.width / 2 - topHudWidth / 2, 10, topHudWidth, 70, [12]);
     ctx.fill();
     ctx.stroke();
 
     // ALTERAÇÃO 4: O fundo do score foi removido daqui e combinado com o da velocidade.
 
     // HUD de pontuação e velocidade
-    const rightHudWidth = 200;
+    const rightHudWidth = 180;
     ctx.beginPath();
-    ctx.roundRect(canvas.width - rightHudWidth - 15, canvas.height - 115, rightHudWidth, 100, [12]);
+    ctx.roundRect(canvas.width - rightHudWidth - 15, canvas.height - 95, rightHudWidth, 80, [12]);
     ctx.fill();
     ctx.stroke();
 
@@ -1320,17 +1318,17 @@ function drawHudText(me) {
     ctx.shadowOffsetY = 2;
 
     // --- HUD Superior ---
-    const topHudCenterY = 10 + 90 / 2;
-    ctx.font = 'bold 40px Arial';
+    const topHudCenterY = 10 + 70 / 2;
+    ctx.font = 'bold 32px Arial';
     if (gameState.gamePhase === 'waiting') {
         const seconds = gameState.startTime % 60;
         ctx.fillText(`0:${String(seconds).padStart(2, '0')}`, canvas.width / 2, topHudCenterY + 15);
-        ctx.font = '24px Arial';
+        ctx.font = '18px Arial';
         ctx.fillText('The round starts in...', canvas.width / 2, topHudCenterY - 18);
     } else if (gameState.gamePhase === 'post-round') {
         const seconds = gameState.postRoundTimeLeft;
         ctx.fillText(`Restarting in: ${seconds}`, canvas.width / 2, topHudCenterY - 10);
-        ctx.font = 'bold 28px Arial';
+        ctx.font = 'bold 22px Arial';
         ctx.fillStyle = 'orange';
         ctx.fillText('End of Round!', canvas.width / 2, topHudCenterY + 20);
     } else {
@@ -1353,18 +1351,17 @@ function drawHudText(me) {
 
     // --- HUD de Pontuação e Velocidade ---
     ctx.textAlign = 'right';
-    ctx.font = 'bold 24px Arial';
+    ctx.font = 'bold 20px Arial';
 
     // ALTERAÇÃO 4: Desenha o Score
     ctx.fillStyle = '#FFD700';
     const scoreText = `SCORE: ${Math.floor(me.score)}`;
-    ctx.fillText(scoreText, canvas.width - 30, canvas.height - 85);
+    ctx.fillText(scoreText, canvas.width - 30, canvas.height - 65);
 
     // Desenha a Velocidade
     ctx.fillStyle = 'white';
-    const displayedSpeed = Math.max(1, me.speed - 2);
-    ctx.fillText(`SPEED: ${displayedSpeed.toFixed(2)}`, canvas.width - 30, canvas.height - 45);
-
+    const displayedSpeed = Math.max(1, me.speed - 3);
+    ctx.fillText(`SPEED: ${displayedSpeed.toFixed(2)}`, canvas.width - 30, canvas.height - 35);
     ctx.restore();
 }
 
@@ -1376,7 +1373,7 @@ function drawInventory() {
 
     if (me.role === 'human') {
         const numSlots = me.inventorySlots || 1;
-        const slotSize = 80;
+        const slotSize = 60;
         const gap = 15;
         const totalWidth = (numSlots * slotSize) + ((numSlots - 1) * gap);
         const startX = canvas.width / 2 - totalWidth / 2;
